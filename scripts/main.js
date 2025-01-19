@@ -1,0 +1,1 @@
+console.log('Quiz Quest scripts loaded!');
