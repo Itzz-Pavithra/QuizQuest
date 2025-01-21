@@ -7,9 +7,8 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$db = Database::getInstance();
+$db = Database::getInstance()->getDB();
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,117 +17,7 @@ $db = Database::getInstance();
     <title>Create Quiz - QuizQuest</title>
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        .create-container {
-            padding-top: 80px;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        .question-form {
-            background: white;
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--dark-color);
-            font-weight: bold;
-        }
-
-        .form-group input[type="text"],
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 0.8rem;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 1rem;
-        }
-
-        .options-container {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .option-input {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .correct-option {
-            background: #e8f5e9;
-            border-color: #4caf50;
-        }
-
-        .add-option-btn {
-            background: var(--secondary-color);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .add-option-btn:hover {
-            background: #27ae60;
-        }
-
-        .remove-option-btn {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 0.5rem;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .remove-option-btn:hover {
-            background: #c0392b;
-        }
-
-        .preview-section {
-            margin-top: 2rem;
-            background: white;
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .preview-question {
-            margin-bottom: 1rem;
-            padding: 1rem;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-
-        .error-message {
-            color: var(--accent-color);
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .success-message {
-            color: var(--secondary-color);
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-        }
-    </style>
-</head>
+    </head>
 <body>
     <nav class="navbar">
         <div class="nav-brand">
@@ -143,7 +32,9 @@ $db = Database::getInstance();
     </nav>
 
     <div class="create-container">
-        <h1 class="animate__animated animate__fadeIn"><i class="fas fa-plus-circle"></i> Create Quiz Question</h1>
+        <h1 class="animate__animated animate__fadeIn">
+            <i class="fas fa-plus-circle"></i> Create Quiz Question
+        </h1>
         
         <form id="questionForm" class="question-form animate__animated animate__fadeInUp">
             <div class="form-group">
@@ -171,13 +62,13 @@ $db = Database::getInstance();
 
             <div class="form-group">
                 <label for="question">Question</label>
-                <textarea id="question" name="question" rows="3" required></textarea>
+                <textarea id="question" name="question" rows="3" required 
+                    placeholder="Enter your question here..."></textarea>
             </div>
 
             <div class="form-group">
                 <label>Options</label>
                 <div id="optionsContainer">
-                    <!-- Options Container Content -->
                     <div class="option-input">
                         <input type="text" name="options[]" placeholder="Option 1" required>
                         <input type="radio" name="correct" value="0" required>
@@ -200,8 +91,13 @@ $db = Database::getInstance();
 
             <div class="form-group">
                 <label for="explanation">Explanation (Optional)</label>
-                <textarea id="explanation" name="explanation" rows="2"></textarea>
+                <textarea id="explanation" name="explanation" rows="2" 
+                    placeholder="Explain why the correct answer is right..."></textarea>
                 <small>Provide an explanation for the correct answer</small>
+            </div>
+
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-2x"></i>
             </div>
 
             <button type="submit" class="btn primary-btn">
@@ -211,9 +107,7 @@ $db = Database::getInstance();
 
         <div id="preview" class="preview-section animate__animated animate__fadeIn" style="display: none;">
             <h2><i class="fas fa-eye"></i> Preview</h2>
-            <div class="preview-question">
-                <!-- Preview content will be inserted here -->
-            </div>
+            <div class="preview-question"></div>
         </div>
     </div>
 
@@ -223,6 +117,7 @@ $db = Database::getInstance();
             const optionsContainer = document.getElementById('optionsContainer');
             const addOptionBtn = document.getElementById('addOptionBtn');
             const preview = document.getElementById('preview');
+            const loadingSpinner = document.querySelector('.loading-spinner');
             let optionCount = 2;
 
             // Add new option
@@ -267,11 +162,28 @@ $db = Database::getInstance();
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
-                const formData = new FormData(form);
                 try {
+                    loadingSpinner.style.display = 'block';
+                    const formData = new FormData(form);
+                    
+                    // Create the question data object
+                    const questionData = {
+                        domain: formData.get('domain'),
+                        difficulty: formData.get('difficulty'),
+                        question: formData.get('question'),
+                        options: formData.getAll('options[]'),
+                        correct_answer: parseInt(formData.get('correct')),
+                        explanation: formData.get('explanation'),
+                        created_by: <?php echo json_encode($_SESSION['user_id']); ?>,
+                        created_at: new Date().toISOString()
+                    };
+
                     const response = await fetch('api/save_question.php', {
                         method: 'POST',
-                        body: formData
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(questionData)
                     });
                     
                     const data = await response.json();
@@ -279,15 +191,30 @@ $db = Database::getInstance();
                     if (data.success) {
                         showPreview(formData);
                         form.reset();
-                        alert('Question saved successfully!');
+                        showMessage('Question saved successfully!', 'success');
                     } else {
-                        alert(data.message || 'Error saving question');
+                        showMessage(data.message || 'Error saving question', 'error');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('An error occurred. Please try again.');
+                    showMessage('An error occurred. Please try again.', 'error');
+                } finally {
+                    loadingSpinner.style.display = 'none';
                 }
             });
+
+            // Show message function
+            function showMessage(message, type) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = type === 'success' ? 'success-message' : 'error-message';
+                messageDiv.textContent = message;
+                
+                form.insertBefore(messageDiv, form.firstChild);
+                
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 5000);
+            }
 
             // Show preview
             function showPreview(formData) {
@@ -295,6 +222,8 @@ $db = Database::getInstance();
                 const question = formData.get('question');
                 const options = formData.getAll('options[]');
                 const correctIndex = formData.get('correct');
+                const domain = formData.get('domain');
+                const difficulty = formData.get('difficulty');
                 
                 let optionsHtml = '';
                 options.forEach((option, index) => {
@@ -308,6 +237,10 @@ $db = Database::getInstance();
                 });
 
                 previewContent.innerHTML = `
+                    <div class="question-meta">
+                        <span class="domain">${domain}</span> | 
+                        <span class="difficulty">${difficulty}</span>
+                    </div>
                     <h3>${question}</h3>
                     <div class="options">
                         ${optionsHtml}
